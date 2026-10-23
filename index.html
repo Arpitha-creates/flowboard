@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flowboard — kanban task board</title>
+<style>
+  :root{
+    --bg:#eef1f7; --col:#f7f8fc; --ink:#1f2430; --muted:#8a93a6; --line:#e2e6f0;
+    --shadow:0 6px 18px rgba(31,36,48,.07); --shadow2:0 14px 40px rgba(31,36,48,.16);
+    --c1:#6c8cff; --c2:#ff8a5c; --c3:#3ecfa0; --c4:#c084fc; --c5:#ffc93c; --c6:#ff6b9d;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);overflow:hidden}
+  .app{display:flex;flex-direction:column;height:100vh}
+  header{display:flex;align-items:center;gap:14px;padding:16px 22px 12px;flex-wrap:wrap}
+  .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--c1),var(--c4));
+    display:grid;place-items:center;color:#fff;font-weight:800;box-shadow:var(--shadow)}
+  .boardname{font-size:21px;font-weight:800;letter-spacing:-.2px;background:transparent;border:1px solid transparent;
+    border-radius:9px;padding:5px 9px;font-family:inherit;color:inherit;min-width:120px;max-width:52vw}
+  .boardname:hover{border-color:var(--line);background:#fff}
+  .boardname:focus{outline:none;border-color:var(--c1);background:#fff;box-shadow:0 0 0 3px rgba(108,140,255,.15)}
+  .spacer{flex:1}
+  .tool{border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 13px;font-size:13.5px;
+    font-weight:600;color:#4a5266;cursor:pointer;transition:.13s;font-family:inherit;white-space:nowrap}
+  .tool:hover{border-color:#c3cbdd;transform:translateY(-1px);box-shadow:var(--shadow)}
+  .tool.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .tool.primary:hover{background:#2b3244}
+  .hint{color:var(--muted);font-size:12.5px}
+  .board{flex:1;display:flex;gap:16px;padding:6px 22px 22px;overflow-x:auto;overflow-y:hidden;align-items:flex-start}
+  .board::-webkit-scrollbar{height:10px}
+  .board::-webkit-scrollbar-thumb{background:#cfd6e6;border-radius:99px}
+  .column{background:var(--col);border-radius:18px;width:290px;min-width:290px;max-height:100%;
+    display:flex;flex-direction:column;box-shadow:var(--shadow);border:1px solid #eceff7;transition:box-shadow .15s,transform .15s}
+  .column.drop-target{box-shadow:0 0 0 2.5px var(--c1), var(--shadow2)}
+  .col-head{display:flex;align-items:center;gap:9px;padding:14px 14px 10px}
+  .col-dot{width:10px;height:10px;border-radius:50%;flex:none}
+  .col-title{font-weight:700;font-size:14.5px;flex:1;border:1px solid transparent;border-radius:7px;padding:3px 6px;
+    background:transparent;color:inherit;font-family:inherit;min-width:40px}
+  .col-title:hover{border-color:var(--line);background:#fff}
+  .col-title:focus{outline:none;border-color:var(--c1);background:#fff}
+  .col-count{font-size:12px;color:var(--muted);background:#e9edf6;border-radius:999px;padding:2px 9px;font-weight:700}
+  .col-del{border:none;background:transparent;color:#b8c0d2;cursor:pointer;font-size:15px;border-radius:7px;width:26px;height:26px}
+  .col-del:hover{color:#ff6b6b;background:#fff}
+  .cards{list-style:none;margin:0;padding:2px 10px 10px;overflow-y:auto;flex:1;min-height:30px}
+  .cards::-webkit-scrollbar{width:8px}
+  .cards::-webkit-scrollbar-thumb{background:#dde2ee;border-radius:99px}
+  .card{background:#fff;border:1px solid #eceff7;border-radius:13px;padding:12px 13px;margin-bottom:9px;
+    box-shadow:0 2px 6px rgba(31,36,48,.05);cursor:grab;position:relative;transition:box-shadow .13s,transform .13s;
+    touch-action:none;user-select:none}
+  .card:hover{box-shadow:var(--shadow);transform:translateY(-1px)}
+  .card.dragging{opacity:.35}
+  .card .txt{font-size:14px;line-height:1.45;word-break:break-word;white-space:pre-wrap}
+  .card .tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:3px 9px;border-radius:999px;margin-top:9px}
+  .card .x{position:absolute;top:8px;right:8px;border:none;background:#f0f2f8;color:#aab2c4;width:22px;height:22px;
+    border-radius:7px;cursor:pointer;font-size:13px;opacity:0;transition:.12s;line-height:1}
+  .card:hover .x{opacity:1}
+  .card .x:hover{background:#ffe3e3;color:#ff5b5b}
+  .addcard{margin:0 10px 12px;border:1.5px dashed #cfd6e6;background:transparent;border-radius:12px;padding:11px;
+    color:var(--muted);font-weight:600;font-size:13.5px;cursor:pointer;font-family:inherit;transition:.13s;text-align:left}
+  .addcard:hover{border-color:var(--c1);color:var(--c1);background:#fff}
+  .composer{background:#fff;border-radius:13px;padding:11px;margin:0 10px 12px;box-shadow:var(--shadow2);border:1px solid #e6eaf4}
+  .composer textarea{width:100%;border:none;resize:none;font-family:inherit;font-size:14px;outline:none;min-height:44px;color:var(--ink)}
+  .composer .tags{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 10px}
+  .chip{font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;cursor:pointer;border:1.5px solid transparent;opacity:.55}
+  .chip.sel{opacity:1;border-color:currentColor}
+  .composer .row{display:flex;gap:8px}
+  .mini{border:none;border-radius:9px;padding:8px 14px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit}
+  .mini.save{background:var(--ink);color:#fff}
+  .mini.cancel{background:#eef0f6;color:#5b6377}
+  .addcol{min-width:270px;background:rgba(255,255,255,.5);border:1.5px dashed #cbd3e4;border-radius:18px;padding:16px;
+    color:var(--muted);font-weight:700;cursor:pointer;font-family:inherit;font-size:14px;height:64px}
+  .addcol:hover{border-color:var(--c1);color:var(--c1);background:#fff}
+  .ghost{position:fixed;pointer-events:none;z-index:999;transform:rotate(3deg) scale(1.03);opacity:.95;
+    box-shadow:var(--shadow2);border-radius:13px;background:#fff;padding:12px 13px;width:266px;border:1px solid #e6eaf4}
+  .ghost .txt{font-size:14px;line-height:1.45;white-space:pre-wrap}
+  .empty-col{color:#c2c9d8;font-size:13px;text-align:center;padding:14px 6px;font-style:italic}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;
+    padding:11px 18px;border-radius:999px;font-size:13.5px;opacity:0;transition:.25s;pointer-events:none;z-index:1000}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  @media(max-width:640px){
+    header{padding:12px 14px 8px}
+    .board{padding:4px 14px 18px}
+    .boardname{max-width:40vw;font-size:18px}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">F</div>
+    <input class="boardname" id="boardName" value="My board" aria-label="Board name">
+    <span class="hint" id="hint">drag cards between columns · click to rename</span>
+    <span class="spacer"></span>
+    <button class="tool" id="exportBtn">Export</button>
+    <button class="tool" id="importBtn">Import</button>
+    <button class="tool" id="resetBtn">Reset</button>
+  </header>
+  <div class="board" id="board"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+  var KEY="flowboard.v1";
+  var board=document.getElementById("board");
+  var boardName=document.getElementById("boardName");
+  var toastEl=document.getElementById("toast");
+  var PALETTE=["#6c8cff","#ff8a5c","#3ecfa0","#c084fc","#ffc93c","#ff6b9d"];
+
+  function uid(){ return Math.random().toString(36).slice(2,9); }
+  function toast(m){ toastEl.textContent=m; toastEl.classList.add("show"); setTimeout(function(){toastEl.classList.remove("show");},1600); }
+  function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+
+  var state=load();
+  function load(){
+    try{ var r=localStorage.getItem(KEY); if(r){ var s=JSON.parse(r); if(s&&s.columns) return s; } }catch(e){}
+    return seed();
+  }
+  function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+
+  function seed(){
+    return {
+      name:"My board",
+      columns:[
+        {id:uid(),name:"To do",color:PALETTE[0],cards:[
+          {id:uid(),text:"Read the Monsoon game rules",tag:null},
+          {id:uid(),text:"Plan weekend trip",tag:"personal"}
+        ]},
+        {id:uid(),name:"In progress",color:PALETTE[1],cards:[
+          {id:uid(),text:"Ship the pocket-suite apps",tag:"work"}
+        ]},
+        {id:uid(),name:"Done",color:PALETTE[2],cards:[
+          {id:uid(),text:"Set up this board",tag:null}
+        ]}
+      ]
+    };
+  }
+  var TAGS=["work","personal","idea","urgent","later"];
+
+  /* ---------------- render ---------------- */
+  function render(){
+    boardName.value=state.name;
+    board.innerHTML="";
+    state.columns.forEach(function(col){
+      board.appendChild(renderColumn(col));
+    });
+    var add=document.createElement("button");
+    add.className="addcol"; add.textContent="+ Add column";
+    add.onclick=function(){
+      state.columns.push({id:uid(),name:"New column",color:PALETTE[state.columns.length%PALETTE.length],cards:[]});
+      save(); render();
+    };
+    board.appendChild(add);
+  }
+
+  function renderColumn(col){
+    var el=document.createElement("section");
+    el.className="column"; el.dataset.col=col.id;
+
+    var head=document.createElement("div"); head.className="col-head";
+    var dot=document.createElement("span"); dot.className="col-dot"; dot.style.background=col.color;
+    var title=document.createElement("input"); title.className="col-title"; title.value=col.name;
+    title.oninput=function(){ col.name=title.value; save(); };
+    var count=document.createElement("span"); count.className="col-count"; count.textContent=col.cards.length;
+    var del=document.createElement("button"); del.className="col-del"; del.textContent="✕"; del.title="Delete column";
+    del.onclick=function(){ if(confirm('Delete column "'+col.name+'" and its cards?')){ state.columns=state.columns.filter(function(c){return c.id!==col.id;}); save(); render(); } };
+    head.appendChild(dot); head.appendChild(title); head.appendChild(count); head.appendChild(del);
+    el.appendChild(head);
+
+    var list=document.createElement("ul"); list.className="cards"; list.dataset.col=col.id;
+    if(!col.cards.length){
+      var e=document.createElement("li"); e.className="empty-col"; e.textContent="Drop cards here"; list.appendChild(e);
+    }
+    col.cards.forEach(function(card){ list.appendChild(renderCard(col,card)); });
+    el.appendChild(list);
+
+    var addBtn=document.createElement("button"); addBtn.className="addcard"; addBtn.textContent="+ Add a card";
+    addBtn.onclick=function(){ openComposer(col, el, addBtn); };
+    el.appendChild(addBtn);
+    return el;
+  }
+
+  function renderCard(col,card){
+    var li=document.createElement("li"); li.className="card"; li.dataset.id=card.id; li.dataset.col=col.id;
+    var txt=document.createElement("div"); txt.className="txt"; txt.textContent=card.text;
+    li.appendChild(txt);
+    if(card.tag){ var t=document.createElement("span"); t.className="tag"; t.textContent=card.tag;
+      var c=tagColor(card.tag); t.style.background=c.bg; t.style.color=c.fg; li.appendChild(t); }
+    var x=document.createElement("button"); x.className="x"; x.textContent="✕"; x.title="Delete";
+    x.onclick=function(ev){ ev.stopPropagation(); col.cards=col.cards.filter(function(k){return k.id!==card.id;}); save(); render(); };
+    li.appendChild(x);
+
+    // click to edit (but not after a drag)
+    li.addEventListener("dblclick",function(){ editCard(col,card); });
+    attachDrag(li, col, card);
+    return li;
+  }
+
+  function tagColor(tag){
+    var map={work:{bg:"#e6ecff",fg:"#3d5bd9"},personal:{bg:"#e2f7ee",fg:"#1f9c6d"},
+      idea:{bg:"#f3e8ff",fg:"#8b3fd6"},urgent:{bg:"#ffe4e4",fg:"#d93636"},later:{bg:"#fff2d6",fg:"#b57a00"}};
+    return map[tag]||{bg:"#eef0f6",fg:"#5b6377"};
+  }
+
+  function editCard(col,card){
+    var v=prompt("Edit card:", card.text);
+    if(v===null) return;
+    card.text=v.trim()||card.text;
+    var nt=prompt("Tag (leave blank for none):\n"+TAGS.join(", "), card.tag||"");
+    if(nt!==null){ nt=nt.trim().toLowerCase(); card.tag = TAGS.indexOf(nt)>=0 ? nt : (nt||null); }
+    save(); render();
+  }
+
+  function openComposer(col, colEl, addBtn){
+    if(colEl.querySelector(".composer")) return;
+    var box=document.createElement("div"); box.className="composer";
+    var ta=document.createElement("textarea"); ta.placeholder="Write a card… (Ctrl+Enter to add)";
+    var tags=document.createElement("div"); tags.className="tags";
+    var selected=null;
+    TAGS.forEach(function(tg){
+      var chip=document.createElement("span"); chip.className="chip"; chip.textContent=tg;
+      var c=tagColor(tg); chip.style.background=c.bg; chip.style.color=c.fg;
+      chip.onclick=function(){
+        if(selected===tg){ selected=null; } else { selected=tg; }
+        [].forEach.call(tags.children,function(ch){ ch.classList.remove("sel"); });
+        if(selected) chip.classList.add("sel");
+      };
+      tags.appendChild(chip);
+    });
+    var row=document.createElement("div"); row.className="row";
+    var saveBtn=document.createElement("button"); saveBtn.className="mini save"; saveBtn.textContent="Add";
+    var cancel=document.createElement("button"); cancel.className="mini cancel"; cancel.textContent="Cancel";
+    function commit(){
+      var v=ta.value.trim(); if(!v){ cancelFn(); return; }
+      col.cards.push({id:uid(),text:v,tag:selected});
+      save(); render();
+    }
+    function cancelFn(){ box.remove(); addBtn.style.display=""; }
+    saveBtn.onclick=commit; cancel.onclick=cancelFn;
+    ta.addEventListener("keydown",function(e){ if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){ e.preventDefault(); commit(); } if(e.key==="Escape") cancelFn(); });
+    row.appendChild(saveBtn); row.appendChild(cancel);
+    box.appendChild(ta); box.appendChild(tags); box.appendChild(row);
+    addBtn.style.display="none";
+    colEl.insertBefore(box, addBtn);
+    ta.focus();
+  }
+
+  /* ---------------- drag (pointer based, touch + mouse) ---------------- */
+  var drag=null;
+  function attachDrag(li, col, card){
+    li.addEventListener("pointerdown",function(e){
+      if(e.button!==0 && e.pointerType==="mouse") return;
+      var startX=e.clientX, startY=e.clientY, moved=false;
+      var ghost=null;
+      var rect=li.getBoundingClientRect();
+      var offX=e.clientX-rect.left, offY=e.clientY-rect.top;
+
+      function onMove(ev){
+        if(!moved){
+          if(Math.abs(ev.clientX-startX)+Math.abs(ev.clientY-startY) < 6) return;
+          moved=true;
+          li.classList.add("dragging");
+          ghost=document.createElement("div"); ghost.className="ghost";
+          var g=document.createElement("div"); g.className="txt"; g.textContent=card.text; ghost.appendChild(g);
+          if(card.tag){ var t=document.createElement("span"); t.className="tag"; t.textContent=card.tag;
+            var c=tagColor(card.tag); t.style.background=c.bg; t.style.color=c.fg; ghost.appendChild(t); }
+          document.body.appendChild(ghost);
+          document.body.style.cursor="grabbing";
+        }
+        ghost.style.left=(ev.clientX-offX)+"px";
+        ghost.style.top=(ev.clientY-offY)+"px";
+        highlight(ev.clientX,ev.clientY);
+        ev.preventDefault();
+      }
+      function onUp(ev){
+        window.removeEventListener("pointermove",onMove);
+        window.removeEventListener("pointerup",onUp);
+        window.removeEventListener("pointercancel",onUp);
+        document.body.style.cursor="";
+        if(!moved) return;
+        if(ghost) ghost.remove();
+        li.classList.remove("dragging");
+        clearHighlight();
+        var target=columnAt(ev.clientX,ev.clientY);
+        if(target && target!==col.id){
+          var tcol=state.columns.filter(function(c){return c.id===target;})[0];
+          var tcolIdx=state.columns.indexOf(tcol);
+          var fromIdx=col.cards.indexOf(card);
+          if(fromIdx>=0) col.cards.splice(fromIdx,1);
+          // insert based on pointer position relative to cards
+          var listEl=document.querySelector('.cards[data-col="'+target+'"]');
+          var insertIdx=tcol.cards.length;
+          if(listEl){
+            var kids=[].slice.call(listEl.querySelectorAll(".card"));
+            for(var i=0;i<kids.length;i++){
+              var r=kids[i].getBoundingClientRect();
+              if(ev.clientY < r.top + r.height/2){ insertIdx=i; break; }
+            }
+          }
+          tcol.cards.splice(insertIdx,0,card);
+          save(); render();
+        } else if(target===col.id){
+          // reorder within same column
+          var listEl2=document.querySelector('.cards[data-col="'+col.id+'"]');
+          if(listEl2){
+            var kids2=[].slice.call(listEl2.querySelectorAll(".card"));
+            var insertIdx2=col.cards.length;
+            for(var j=0;j<kids2.length;j++){
+              var r2=kids2[j].getBoundingClientRect();
+              if(ev.clientY < r2.top + r2.height/2){ insertIdx2=j; break; }
+            }
+            var oldIdx=col.cards.indexOf(card);
+            col.cards.splice(oldIdx,1);
+            if(insertIdx2>oldIdx) insertIdx2--;
+            col.cards.splice(insertIdx2,0,card);
+            save(); render();
+          }
+        }
+      }
+      window.addEventListener("pointermove",onMove,{passive:false});
+      window.addEventListener("pointerup",onUp);
+      window.addEventListener("pointercancel",onUp);
+    });
+  }
+  function columnAt(x,y){
+    var els=document.elementsFromPoint(x,y);
+    for(var i=0;i<els.length;i++){ var c=els[i].closest?els[i].closest(".column"):null; if(c) return c.dataset.col; }
+    return null;
+  }
+  function highlight(x,y){
+    clearHighlight();
+    var id=columnAt(x,y);
+    if(id){ var c=document.querySelector('.column[data-col="'+id+'"]'); if(c) c.classList.add("drop-target"); }
+  }
+  function clearHighlight(){ [].forEach.call(document.querySelectorAll(".column.drop-target"),function(c){c.classList.remove("drop-target");}); }
+
+  /* ---------------- header actions ---------------- */
+  boardName.addEventListener("input",function(){ state.name=boardName.value; save(); });
+  document.getElementById("resetBtn").onclick=function(){
+    if(confirm("Reset the board to the default? This clears your cards.")){ state=seed(); save(); render(); toast("Board reset"); }
+  };
+  document.getElementById("exportBtn").onclick=function(){
+    var blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+    var a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+    a.download=(state.name||"board").replace(/\s+/g,"-").toLowerCase()+".json";
+    a.click(); URL.revokeObjectURL(a.href); toast("Exported");
+  };
+  document.getElementById("importBtn").onclick=function(){
+    var inp=document.createElement("input"); inp.type="file"; inp.accept=".json,application/json";
+    inp.onchange=function(){ var f=inp.files[0]; if(!f) return; var r=new FileReader();
+      r.onload=function(){ try{ var s=JSON.parse(r.result); if(s&&s.columns){ state=s; if(!state.name) state.name="Imported board"; save(); render(); toast("Imported"); } else toast("Unrecognised file"); }catch(e){ toast("Could not read that file"); } };
+      r.readAsText(f); };
+    inp.click();
+  };
+
+  render();
+})();
+</script>
+</body>
+</html>
